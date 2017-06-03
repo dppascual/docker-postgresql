@@ -7,21 +7,25 @@ MAINTAINER "Daniel Peña <dppascual@gmail.com>"
 
 ENV PG_VERSION=9.6 \
     PG_USER=postgres \
-    PG_HOME=/var/lib/postgresql \
-    PG_DATADIR=${PG_HOME}/${PG_VERSION}/main \
-    PG_RUNDIR=/run/postgresql \
-    PG_BINDIR=/usr/lib/postgresql/${PG_VERSION}/bin \
+    PG_RUNDIR=/var/run/postgresql \
     PG_LOGDIR=/var/log/postgresql
 
-RUN sudo add-apt-repository "deb http://apt.postgresql.org/pub/repos/apt/ xenial-pgdg main" \
- && wget --quiet -O - https://www.postgresql.org/media/keys/ACCC4CF8.asc | sudo apt-key add - \
+# It's necessary to separate environment variables when you want to use one of them over another
+ENV PG_HOME=/etc/postgresql/${PG_VERSION}/main \
+    PG_BINDIR=/usr/lib/postgresql/${PG_VERSION}/bin \
+    PG_DATADIR=/var/lib/postgresql/${PG_VERSION}/main
+
+RUN apt-get -qqy update \
+ && DEBIAN_FRONTEND=noninteractive apt-get install -qqy software-properties-common wget \
+ && add-apt-repository "deb http://apt.postgresql.org/pub/repos/apt/ xenial-pgdg main" \
+ && wget --quiet -O - https://www.postgresql.org/media/keys/ACCC4CF8.asc | apt-key add - \
  && apt-get -qqy update \
- && apt-get install -qqy postgresql-{PG_VERSION} postgresql-contrib-{PG-VERSION} \
+ && DEBIAN_FRONTEND=noninteractive apt-get install -qqy postgresql-${PG_VERSION} postgresql-contrib-${PG_VERSION} \
  && apt-get clean
 
 EXPOSE 5432/tcp
 
 ADD entrypoint.sh /sbin/entrypoint.sh
-RUN chmod u+x /sbin/entrypoint.sh
+RUN chmod u+x /sbin/entrypoint.sh && su - ${PG_USER} -c "mkdir -p ${PG_RUNDIR}/${PG_VERSION}-main.pg_stat_tmp"
 
 ENTRYPOINT ["/sbin/entrypoint.sh"]
