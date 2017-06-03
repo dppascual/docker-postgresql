@@ -17,7 +17,7 @@ ENV PG_HOME=/etc/postgresql/${PG_VERSION}/main \
 
 RUN apt-get -qqy update \
  && DEBIAN_FRONTEND=noninteractive apt-get install -qqy software-properties-common wget \
- && add-apt-repository "deb http://apt.postgresql.org/pub/repos/apt/ xenial-pgdg main" \
+ && add-apt-repository "deb http://apt.postgresql.org/pub/repos/apt/ $(cat /etc/lsb-release | grep -i "codename" | awk -F "=" '{print $2}') main" \
  && wget --quiet -O - https://www.postgresql.org/media/keys/ACCC4CF8.asc | apt-key add - \
  && apt-get -qqy update \
  && DEBIAN_FRONTEND=noninteractive apt-get install -qqy postgresql-${PG_VERSION} postgresql-contrib-${PG_VERSION} \
