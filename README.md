@@ -40,5 +40,5 @@ docker run --name postgresql -d --restart always \
 Login to the PostgreSQL server using:
 
 ```bash
-docker exec -it postgresql sudo -i -u postgres psql
+docker exec -it postgresql su - postgres -c psql
 ```
