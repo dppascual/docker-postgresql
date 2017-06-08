@@ -1,0 +1,91 @@
+#!/bin/bash
+
+set -eo pipefail
+
+PG_POSTGRESQL_CONF=${PG_HOME}/postgresql.conf
+PG_HBA_CONF=${PG_HOME}/pg_hba.conf
+DB_USER={$DB_USER:-}
+DB_NAME={$DB_NAME:-}
+
+exec_as_postgres() {
+    sudo -HEu $PG_USER -i "$@"
+}
+
+set_postgresql_param() {
+    local key=$1
+    local value=$2
+    local verbosity=${3:-verbose}
+
+    if [[ -n $value ]]; then
+        local current_value=$(awk -F"'" ' /^${key}/ {print $2}' ${PG_POSTGRESQL_CONF})
+        if [[ $current_value != $value ]]; then
+            if [[ $verbosity == "verbose" ]]; then
+                echo "> Setting postgresql.conf parameter: $key = $value"
+            fi
+            sed -ie "s/^#* *${key} \?=[ ']\{0,2\}[^\t ']*'\?/${key} = '$current_value}'/" ${PG_POSTGRESQL_CONF}
+}
+
+set_hba_param() {
+    local value=$1
+    local verbosity=${2:-verbose}
+
+    if ! grep -qie "$(sed -e "s/ / \\\+/g" <<< ${value})" ${PG_HBA_CONF}; then
+        if [[ $verbosity == "verbose" ]]; then
+            echo "> Setting pg_hba.conf parameter: $value"
+        fi
+        echo $value >> ${PG_HBA_CONF}
+    fi
+}
+
+create_users() {
+    if [[ -n $DB_USER ]]; then
+        for field in $(awk -F',' '{for (i = 1; i <= NF; i++) print $i}' <<< $DB_USER); do
+            local user=${field%:*}
+            local pass=${field#*:}
+
+            echo "> Creating database user: ${user}..."
+            if [[ -z $(exec_as_postgres psql -Atc "SELECT 1 FROM pg_roles WHERE rolname='${user}';") ]]; then
+                exec_as_postgres psql -c "CREATE ROLE $user with LOGIN CREATEDB PASSWORD '$pass';"
+            fi
+        done
+    fi
+}
+
+create_databases() {
+    if [[ -n $DB_NAME ]]; then
+        for field in $(awk -F',' '{for (i = 1; i <= NF; i++) print $i}' <<< $DB_NAME); do
+            local user=${field%:*}
+            local db=${field#*:}
+
+            if [[ -z $(exec_as_postgres psql -Atc "SELECT 1 FROM pg_catalog.pg_database WHERE datname='${db}';") ]]; then
+                echo "> Creating database: ${db}..."
+                exec_as_postgres psql -c "CREATE DATABASE \"${db}\";"
+            else
+                echo "> The database ${db} already exists."
+            fi
+
+            if [[ -z $(exec_as_postgres psql -Atc "SELECT 1 FROM pg_roles WHERE rolname='${user}';") ]]; then
+                echo "> There is not any user ${user} in the database."
+            else
+                echo "> Granting acces to ${user} user..."
+                exec_as_postgres psql -c "GRANT ALL PRIVILEGES ON DATABASE \"${db}\" to \"${user}\";"
+            fi
+        done
+    fi
+}
+
+configure_postgresql() {
+    # Start PostgreSQL server internally to create users and databases
+    set_postgresql_param "listen_addresses" "127.0.0.1" silent
+    exec_as_postgres ${PG_BINDIR}/pg_ctl -D ${PG_HOME} -w start > /dev/null
+
+    create_users
+    create_databases
+
+    # Adjust PostgreSQL configuration so that remote connections to the database are possible
+    set_hba_param "host all all 0.0.0.0/0 md5" silent
+    set_postgresql_param "listen_addresses" "*" silent
+
+    # Create temporal directory to allow PostgreSQL to be able to run
+    exec_as_postgres "mkdir -p ${PG_RUNDIR}/${PG_VERSION}-main.pg_stat_tmp"
+}

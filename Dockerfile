@@ -5,7 +5,8 @@
 FROM ubuntu:latest
 MAINTAINER "Daniel Peña <dppascual@gmail.com>"
 
-ENV PG_VERSION=9.6 \
+ENV PG_APP_HOME=/etc/docker-psql \
+    PG_VERSION=9.6 \
     PG_USER=postgres \
     PG_RUNDIR=/var/run/postgresql \
     PG_LOGDIR=/var/log/postgresql
@@ -16,7 +17,7 @@ ENV PG_HOME=/etc/postgresql/${PG_VERSION}/main \
     PG_DATADIR=/var/lib/postgresql/${PG_VERSION}/main
 
 RUN apt-get -qqy update \
- && DEBIAN_FRONTEND=noninteractive apt-get install -qqy software-properties-common wget \
+ && DEBIAN_FRONTEND=noninteractive apt-get install -qqy software-properties-common wget sudo \
  && add-apt-repository "deb http://apt.postgresql.org/pub/repos/apt/ $(cat /etc/lsb-release | grep -i "codename" | awk -F "=" '{print $2}')-pgdg main" \
  && wget --quiet -O - https://www.postgresql.org/media/keys/ACCC4CF8.asc | apt-key add - \
  && apt-get -qqy update \
@@ -25,7 +26,8 @@ RUN apt-get -qqy update \
 
 EXPOSE 5432/tcp
 
+ADD runtime/ ${PG_APP_HOME}/
 ADD entrypoint.sh /sbin/entrypoint.sh
-RUN chmod u+x /sbin/entrypoint.sh && su - ${PG_USER} -c "mkdir -p ${PG_RUNDIR}/${PG_VERSION}-main.pg_stat_tmp"
+RUN chmod u+x /sbin/entrypoint.sh
 
 ENTRYPOINT ["/sbin/entrypoint.sh"]
