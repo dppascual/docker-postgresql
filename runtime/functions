@@ -4,8 +4,8 @@ set -eo pipefail
 
 PG_POSTGRESQL_CONF=${PG_HOME}/postgresql.conf
 PG_HBA_CONF=${PG_HOME}/pg_hba.conf
-DB_USER={$DB_USER:-}
-DB_NAME={$DB_NAME:-}
+DB_USER=${DB_USER:-}
+DB_NAME=${DB_NAME:-}
 
 exec_as_postgres() {
     sudo -HEu $PG_USER -i "$@"
@@ -22,7 +22,9 @@ set_postgresql_param() {
             if [[ $verbosity == "verbose" ]]; then
                 echo "> Setting postgresql.conf parameter: $key = $value"
             fi
-            sed -ie "s/^#* *${key} \?=[ ']\{0,2\}[^\t ']*'\?/${key} = '$current_value}'/" ${PG_POSTGRESQL_CONF}
+            sed -ie "s/^#* *${key} \?=[ ']\{0,2\}[^\t ']*'\?/${key} = '${value}'/" ${PG_POSTGRESQL_CONF}
+        fi
+    fi
 }
 
 set_hba_param() {
@@ -40,6 +42,7 @@ set_hba_param() {
 create_users() {
     if [[ -n $DB_USER ]]; then
         for field in $(awk -F',' '{for (i = 1; i <= NF; i++) print $i}' <<< $DB_USER); do
+            echo ""$field""
             local user=${field%:*}
             local pass=${field#*:}
 
@@ -82,10 +85,13 @@ configure_postgresql() {
     create_users
     create_databases
 
+    # stop the postgres server
+    exec_as_postgres ${PG_BINDIR}/pg_ctl -D ${PG_HOME} -w stop > /dev/null
+
     # Adjust PostgreSQL configuration so that remote connections to the database are possible
     set_hba_param "host all all 0.0.0.0/0 md5" silent
     set_postgresql_param "listen_addresses" "*" silent
 
     # Create temporal directory to allow PostgreSQL to be able to run
-    exec_as_postgres "mkdir -p ${PG_RUNDIR}/${PG_VERSION}-main.pg_stat_tmp"
+    exec_as_postgres mkdir -p ${PG_RUNDIR}/${PG_VERSION}-main.pg_stat_tmp
 }

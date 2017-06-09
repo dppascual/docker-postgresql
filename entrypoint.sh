@@ -23,4 +23,4 @@ echo "Starting set up"
 configure_postgresql
 
 echo "Starting PostgreSQL ${PG_VERSION}..."
-exec su - ${PG_USER} -c "${PG_BINDIR}/postgres -D ${PG_HOME} $EXTRA_ARGS"
+exec sudo -HEu ${PG_USER} -i ${PG_BINDIR}/postgres -D ${PG_HOME} $EXTRA_ARGS

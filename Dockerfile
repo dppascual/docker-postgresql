@@ -26,8 +26,8 @@ RUN apt-get -qqy update \
 
 EXPOSE 5432/tcp
 
-ADD runtime/ ${PG_APP_HOME}/
 ADD entrypoint.sh /sbin/entrypoint.sh
 RUN chmod u+x /sbin/entrypoint.sh
+ADD runtime/ ${PG_APP_HOME}/
 
 ENTRYPOINT ["/sbin/entrypoint.sh"]

@@ -5,4 +5,4 @@
 all: build
 
 build:
-	@docker build -t "dppascual/postgresql:$(shell cat VERSION)" .
+	@docker build -t "dppascual/postgresql:$$(cat VERSION)" .
