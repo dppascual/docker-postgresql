@@ -17,8 +17,8 @@ set_postgresql_param() {
     local verbosity=${3:-verbose}
 
     if [[ -n $value ]]; then
-        local current_value=$(awk -F"'" ' /^${key}/ {print $2}' ${PG_POSTGRESQL_CONF})
-        if [[ $current_value != $value ]]; then
+        local current_value=$(awk -F"'" -v key=$key '$0 ~ "^"key {print $2}' ${PG_POSTGRESQL_CONF})
+        if [[ "$current_value" != "$value" ]]; then
             if [[ $verbosity == "verbose" ]]; then
                 echo "> Setting postgresql.conf parameter: $key = $value"
             fi
@@ -42,7 +42,6 @@ set_hba_param() {
 create_users() {
     if [[ -n $DB_USER ]]; then
         for field in $(awk -F',' '{for (i = 1; i <= NF; i++) print $i}' <<< $DB_USER); do
-            echo ""$field""
             local user=${field%:*}
             local pass=${field#*:}
 
